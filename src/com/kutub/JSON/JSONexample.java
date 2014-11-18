@@ -3,12 +3,12 @@ package com.kutub.JSON;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import com.kutub.JSON.R;
 
 import android.app.Activity;
 import android.content.Context;
@@ -28,6 +28,8 @@ public class JSONexample extends Activity {
 	EditText searchInput;
 	Button searchButton;
 	WebView webView;
+	Timer timer = new Timer();
+
 	
 	
 	final Handler loadContent = new Handler(){
@@ -84,63 +86,65 @@ public class JSONexample extends Activity {
         
         searchButton.setOnClickListener(new View.OnClickListener() {
        
-			@Override
+        	@Override
 			public void onClick(View v) {
-				
-				Thread getURL = new Thread(){
-				
-			    @Override
-				public void run(){
-			
-					if (isNetworkActive()){
-						
-						URL url = null;
-						
+
+				timer = new Timer();
+
+				timer.scheduleAtFixedRate(new TimerTask() {
+					public void run() {
+
 						try {
-							String stockSymbol = searchInput.getText().toString().toUpperCase();
-							String stockURL = "http://finance.yahoo.com/webservice/v1/symbols/" + stockSymbol + "/quote?format=json";
-							url = new URL(stockURL);
-							BufferedReader reader = new BufferedReader(
-									new InputStreamReader(
-											url.openStream()));
-							
-							String response = "", tmpResponse = "";
-							
-							tmpResponse = reader.readLine();
-							while (tmpResponse != null){
-								response = response + tmpResponse;
-								tmpResponse = reader.readLine();
+							if (isNetworkAvailable()) {
+
+								try {
+									String stockSymbol = searchInput.getText()
+											.toString();
+									URL url = new URL(
+											"http://finance.yahoo.com/webservice/v1/symbols/"
+													+ stockSymbol
+													+ "/quote?format=json");
+
+									try {
+
+										BufferedReader in = new BufferedReader(
+												new InputStreamReader(url
+														.openStream()));
+										String data = "";
+										String inputLine = "";
+										while ((inputLine = in.readLine()) != null)
+											data += inputLine;
+										in.close();
+
+										JSONObject jsonResponse = new JSONObject(
+												data);
+
+										Message msg = new Message();
+										msg.obj = jsonResponse;
+
+										loadContent.sendMessage(msg);
+
+									} catch (Exception e) {
+										Log.e("Read Error", e.toString());
+									}
+
+								} catch (Exception e) {
+									Log.e("Read Error", e.toString());
+								}
 							}
-							
-							Message message = loadContent.obtainMessage();
-							
-						
-							message.obj = response;
-							
-							loadContent.sendMessage(message);
-							
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
-						
+
 					}
-				}
-			};
-			
-			getURL.start();
-			
-				
+				}, 0, 10000);
 			}
 		});
-    }
+	}
 
-    public boolean isNetworkActive(){
-    		ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-    		NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-    		if (networkInfo != null && networkInfo.isConnected()) {
-    			return true;
-    		} else {
-    			return false;
-    		}
-    }
+	public boolean isNetworkAvailable() {
+		ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+		NetworkInfo netInfo = cm.getActiveNetworkInfo();
+		return (netInfo != null && netInfo.isConnectedOrConnecting());
+	}
 }
